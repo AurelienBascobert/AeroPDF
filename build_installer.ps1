@@ -1,7 +1,9 @@
-# Script de packaging pour AeroPDF
+# Script de packaging et génération d'installeur pour AeroPDF
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Compilation et Packaging d'AeroPDF ===" -ForegroundColor Cyan
+Write-Host "======================================================" -ForegroundColor Cyan
+Write-Host "        Création de l'installateur AeroPDF           " -ForegroundColor Cyan
+Write-Host "======================================================" -ForegroundColor Cyan
 
 # 1. Compilation Release
 Write-Host "`n[1/4] Compilation en mode Release..." -ForegroundColor Yellow
@@ -18,62 +20,81 @@ if (-not (Test-Path $pdfiumDll)) {
     throw "DLL introuvable : $pdfiumDll"
 }
 
-# 2. Préparation du dossier de distribution
-Write-Host "`n[2/4] Préparation des fichiers..." -ForegroundColor Yellow
-$distDir = "dist\AeroPDF"
-if (Test-Path $distDir) {
-    Remove-Item -Recurse -Force $distDir
+# 2. Création du dossier dist
+$distDir = "dist"
+if (-not (Test-Path $distDir)) {
+    New-Item -ItemType Directory -Path $distDir | Out-Null
 }
-New-Item -ItemType Directory -Path $distDir | Out-Null
 
-Copy-Item $targetExe $distDir
-Copy-Item $pdfiumDll $distDir
-Copy-Item "installer\install.bat" $distDir
-Copy-Item "installer\uninstall.bat" $distDir
+# 3. Génération du vrai installeur .EXE avec Inno Setup
+Write-Host "`n[2/4] Création du VRAI installeur exécutable autonome (.EXE)..." -ForegroundColor Yellow
 
-# Fichier d'information pour l'utilisateur final
+$isccCandidates = @(
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    "C:\Program Files\Inno Setup 6\ISCC.exe",
+    (Get-Command iscc.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
+)
+
+$isccPath = $null
+foreach ($c in $isccCandidates) {
+    if ($c -and (Test-Path $c)) {
+        $isccPath = $c
+        break
+    }
+}
+
+$setupExe = "$distDir\AeroPDF-Setup-v0.1.0.exe"
+
+if ($isccPath) {
+    Write-Host "Utilisation du compilateur Inno Setup : $isccPath" -ForegroundColor Gray
+    & "$isccPath" "installer\aeropdf.iss"
+    if (Test-Path $setupExe) {
+        $setupMb = [math]::Round((Get-Item $setupExe).Length / 1MB, 2)
+        Write-Host "-> Installeur autonome généré : $setupExe ($setupMb Mo)" -ForegroundColor Green
+    }
+} else {
+    Write-Warning "Inno Setup (ISCC.exe) introuvable. Installez-le avec : winget install JRSoftware.InnoSetup"
+}
+
+# 4. Création de l'archive ZIP Portable
+Write-Host "`n[3/4] Création du package portable ZIP..." -ForegroundColor Yellow
+$portableDir = "$distDir\portable_bundle"
+if (Test-Path $portableDir) { Remove-Item -Recurse -Force $portableDir }
+New-Item -ItemType Directory -Path $portableDir | Out-Null
+
+Copy-Item $targetExe $portableDir
+Copy-Item $pdfiumDll $portableDir
+Copy-Item "installer\install.bat" $portableDir
+Copy-Item "installer\uninstall.bat" $portableDir
+
 @"
 ======================================================
                   AeroPDF v0.1.0
       Lecteur PDF ultra-léger et instantané
 ======================================================
 
-INSTALLATION :
-  Double-cliquez sur 'install.bat' pour installer AeroPDF sur
-  votre machine (créera un raccourci Bureau et Menu Démarrer).
+INSTALLATEUR OFFICIEL :
+  Double-cliquez sur 'AeroPDF-Setup-v0.1.0.exe' pour installer
+  AeroPDF comme une vraie application Windows (avec raccourcis,
+  désinstalleur dans Paramètres Windows et association .pdf).
 
-UTILISATION PORTABLE :
+VERSION PORTABLE :
   Vous pouvez aussi simplement lancer 'aeropdf.exe' directement
   depuis ce dossier (aucune installation requise).
+"@ | Set-Content -Path "$portableDir\LISEZ-MOI.txt" -Encoding UTF8
 
-RACCOURCIS CLAVIER :
-  - Espace / Maj+Espace : Défilement fluide
-  - Molette souris      : Défilement inertiel
-  - Ctrl + Molette      : Zoom centré sur la souris
-  - Ctrl + 0            : Réinitialiser le zoom (100%)
-  - Ctrl + F            : Recherche textuelle instantanée
-  - Ctrl + G            : Aller à une page
-  - Ctrl + T / B        : Sommaire / Signets du document
-  - Ctrl + D            : Mode double-page
-  - Ctrl + I ou N       : Mode Nuit (inversion intelligente)
-  - Ctrl + R ou R       : Rotation (90°, 180°, 270°)
-  - Ctrl + O            : Ouvrir un autre PDF
-  - Ctrl + P            : Imprimer le document
-  - Ctrl + C            : Copier le texte sélectionné
-  - F11                 : Plein écran
-  - Echap ou Q          : Quitter
-"@ | Set-Content -Path "$distDir\LISEZ-MOI.txt" -Encoding UTF8
+$zipOutput = "$distDir\AeroPDF-v0.1.0-Portable-x64.zip"
+if (Test-Path $zipOutput) { Remove-Item -Force $zipOutput }
+Compress-Archive -Path "$portableDir\*" -DestinationPath $zipOutput
+Remove-Item -Recurse -Force $portableDir
 
-# 3. Création de l'archive ZIP
-Write-Host "`n[3/4] Création du fichier ZIP d'installation..." -ForegroundColor Yellow
-$zipOutput = "dist\AeroPDF-v0.1.0-Windows-x64.zip"
-if (Test-Path $zipOutput) {
-    Remove-Item -Force $zipOutput
+# 5. Résumé final
+Write-Host "`n======================================================" -ForegroundColor Green
+Write-Host "                Génération terminée !                 " -ForegroundColor Green
+Write-Host "======================================================" -ForegroundColor Green
+if (Test-Path $setupExe) {
+    Write-Host " 1. VRAI INSTALLATEUR .EXE : $setupExe" -ForegroundColor Cyan
 }
-Compress-Archive -Path "$distDir\*" -DestinationPath $zipOutput
-
-# 4. Résumé
-$sizeMb = [math]::Round((Get-Item $zipOutput).Length / 1MB, 2)
-Write-Host "`n[4/4] Paquet créé avec succès !" -ForegroundColor Green
-Write-Host "Archive : $zipOutput ($sizeMb Mo)" -ForegroundColor Green
-Write-Host "Vous pouvez partager ce fichier ZIP pour installer AeroPDF sur n'importe quel PC Windows." -ForegroundColor Cyan
+Write-Host " 2. ARCHIVE PORTABLE .ZIP : $zipOutput" -ForegroundColor Cyan
+Write-Host "`nVous pouvez partager directement '$setupExe' à n'importe qui !" -ForegroundColor White

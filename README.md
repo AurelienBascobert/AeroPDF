@@ -51,16 +51,15 @@ Un lecteur de PDF minimaliste, ultra-rapide et épuré en **Rust**, conçu spéc
 
 ## 📦 Installation & Déploiement
 
-### 1. Utilisation du script d'installation automatique (Windows)
-Téléchargez l'archive `AeroPDF-Windows-x64.zip` et double-cliquez sur `install.bat`.
-Le script :
-- Installe AeroPDF dans `%LOCALAPPDATA%\Programs\AeroPDF`
-- Crée un raccourci sur le **Bureau**
-- Crée un raccourci dans le **Menu Démarrer**
-- Ajoute la commande `aeropdf` dans votre terminal
+### 1. Installateur Windows officiel (Recommandé)
+Téléchargez et lancez **`AeroPDF-Setup-v0.1.0.exe`** (disponible dans les [Releases](https://github.com/AurelienBascobert/AeroPDF/releases)) :
+- Assistant d'installation graphique en français/anglais.
+- Crée les raccourcis sur le **Bureau** et dans le **Menu Démarrer**.
+- Permet d'associer automatiquement les fichiers `.pdf` à AeroPDF.
+- Enregistré proprement dans les **Paramètres Windows > Applications installées** avec désinstalleur officiel.
 
-### 2. Version Portable
-Décompressez simplement l'archive où vous le souhaitez et lancez `aeropdf.exe` (aucun droit administrateur requis).
+### 2. Version Portable (.ZIP)
+Téléchargez **`AeroPDF-v0.1.0-Portable-x64.zip`**, extrayez-le n'importe où et lancez directement `aeropdf.exe`.
 
 ### 3. Compilation depuis les sources
 Nécessite [Rust](https://www.rust-lang.org/) installé :
