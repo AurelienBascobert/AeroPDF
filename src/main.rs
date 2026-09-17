@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use aeropdf::app::AeroPdfApp;
 use std::path::PathBuf;
 
